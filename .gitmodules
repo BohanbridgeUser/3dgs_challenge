@@ -1,0 +1,3 @@
+[submodule "ORIGIN_3DGS"]
+	path = ORIGIN_3DGS
+	url = https://github.com/graphdeco-inria/gaussian-splatting.git
