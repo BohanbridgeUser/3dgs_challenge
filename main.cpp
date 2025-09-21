@@ -3,7 +3,7 @@
 using namespace std;
 
 int main() {
-    string rootDir = "F:/Final";  // ��Ŀ¼
+    string rootDir = "../Final";  // 根目录
     auto results = processAllCases(rootDir);
 
     for (const auto& res : results) {
