@@ -47,8 +47,8 @@ void loadCameras(const string& caseDir, vector<CameraInfo>& cameras_out) {
             ci.T = Eigen::Vector3d(tx, ty, tz);
             ci.FovX = fovX; ci.FovY = fovY;
             ci.width = width; ci.height = height;
-            ci.image_name = "frame_" + to_string(uid) + ".jpg";
-            ci.image_path = caseDir + "/frames/" + ci.image_name;
+            ci.image_name = "";
+            ci.image_path = "";
             ci.is_test = false;
             ci.fx = fx; ci.fy = fy; ci.cx = cx; ci.cy = cy;
             ci.k1 = k1; ci.k2 = k2; ci.k3 = k3; ci.p1 = p1; ci.p2 = p2;
@@ -59,15 +59,30 @@ void loadCameras(const string& caseDir, vector<CameraInfo>& cameras_out) {
 
 // -------------------- 视频帧预处理（流式 CPU 并行） --------------------
 void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
-    fs::path outDir = fs::path(caseDir) / "frames";
+    fs::path outDir = fs::path(caseDir) / "images";
     if (!fs::exists(outDir))
         fs::create_directories(outDir);
 
     if (!fs::is_empty(outDir)) {
-        cout << "[Skip] Frames exist: " << outDir << endl;
+        cout << "[Skip] Images exist: " << outDir << endl;
         return;
     }
-
+    
+    // 读取时间戳
+    fs::path tsFile = fs::path(caseDir) / "inputs" / "videoInfo.txt";
+    ifstream finTS(tsFile);
+    if (!finTS.is_open()) { cerr << "Cannot open " << tsFile << endl; return; }
+    vector<string> timestamps;
+    string line;
+    while (getline(finTS, line)) {
+        if (line.empty()) continue;
+        istringstream iss(line);
+        string col1, col2;
+        iss >> col1 >> col2; // 只取第二列
+        timestamps.push_back(col2);
+    }
+    finTS.close();
+    
     // 找视频
     fs::path videoPath;
     for (auto& p : fs::directory_iterator(caseDir))
@@ -101,13 +116,13 @@ void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
         size_t n = frames.size();
         vector<cv::Mat> undistorted(n);
 
-#pragma omp parallel for schedule(dynamic)
+        #pragma omp parallel for schedule(dynamic)
         for (size_t i = 0; i < n; i++)
             cv::remap(frames[i], undistorted[i], map1, map2, cv::INTER_LINEAR);
 
-        size_t startIndex = frameIndex;
         for (size_t i = 0; i < n; i++) {
-            fs::path outPath = outDir / ("frame_" + to_string(startIndex + i) + ".jpg");
+            if (frameIndex + i >= timestamps.size()) break; // 防越界
+            fs::path outPath = outDir / (timestamps[frameIndex + i] + ".jpg");
             cv::imwrite(outPath.string(), undistorted[i]);
         }
         frameIndex += n;
@@ -122,17 +137,18 @@ void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
 
     if (!batchFrames.empty())
         processBatch(batchFrames);
-
+    
+    if (frameIndex != timestamps.size())
+        cerr << "[Warning] Frame count (" << frameIndex << ") != timestamp count (" << timestamps.size() << ")" << endl;
+    
     cout << "Preprocessed frames for " << caseDir << endl;
 }
 
 
 // -------------------- 已处理帧读取 --------------------
 void extractFrames(const string& caseDir, const CameraInfo& cam, vector<string>& outFramePaths) {
-    std::cout << cam.uid << std::endl;
-    
-    fs::path outDir = fs::path(caseDir) / "frames";
-    if (!fs::exists(outDir)) { cerr << "No frames found" << endl; return; }
+    fs::path outDir = fs::path(caseDir) / "images";
+    if (!fs::exists(outDir)) { cerr << "No images found" << endl; return; }
 
     outFramePaths.clear();
     for (auto& p : fs::directory_iterator(outDir))
@@ -192,3 +208,4 @@ void processAllCases(const string& rootDir, vector<CaseResult>& results, bool pr
         }
     }
 }
+
