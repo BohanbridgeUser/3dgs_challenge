@@ -9,22 +9,23 @@ struct CaseResult {
     std::vector<CameraInfo> cameras;
     Eigen::MatrixXd xyzs;
     Eigen::MatrixXd rgbs;
-    std::vector<std::string> framePaths; // ±£´æ³éÖ¡Â·¾¶
+    std::vector<std::string> framePaths; // ä¿å­˜æŠ½å¸§è·¯å¾„
 };
 
-// Ïà»ú¶ÁÈ¡
+// ç›¸æœºè¯»å–
 void loadCameras(const std::string& caseDir, std::vector<CameraInfo>& cameras_out);
 
-// ÊÓÆµÖ¡´¦Àí£¨º¬»û±ä½ÃÕı£©
-void preprocessFrames(const std::string& caseDir, const CameraInfo& cam);
+// è§†é¢‘å¸§å¤„ç†ï¼ˆå«ç•¸å˜çŸ«æ­£ï¼‰
+void preprocessFrames(const std::string& caseDir, const CameraInfo& cam ,int frameStep = 1);
 void extractFrames(const std::string& caseDir, const CameraInfo& cam, std::vector<std::string>& outFramePaths);
 
-// µãÔÆ¶ÁÈ¡
+// ç‚¹äº‘è¯»å–
 void loadPoints3D(const std::string& file, Eigen::MatrixXd& xyzs, Eigen::MatrixXd& rgbs);
 
-// µ¥¸ö°¸Àı´¦Àí
-void processCase(const std::string& caseDir, CaseResult& result, bool preprocessFlag = true);
+// å•ä¸ªæ¡ˆä¾‹å¤„ç†
+void processCase(const std::string& caseDir, CaseResult& result, bool preprocessFlag = true, int frameStep = 1);
 
-// ÅúÁ¿´¦ÀíËùÓĞ°¸Àı
-void processAllCases(const std::string& rootDir, std::vector<CaseResult>& results, bool preprocessFlag = true);
+// æ‰¹é‡å¤„ç†æ‰€æœ‰æ¡ˆä¾‹
+void processAllCases(const std::string& rootDir, std::vector<CaseResult>& results, bool preprocessFlag = true, int frameStep = 1);
+
 
