@@ -57,8 +57,8 @@ void loadCameras(const string& caseDir, vector<CameraInfo>& cameras_out) {
     }
 }
 
-// -------------------- 视频帧预处理（流式 CPU 并行） --------------------
-void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
+// -------------------- 视频帧预处理 --------------------
+void preprocessFrames(const string& caseDir, const CameraInfo& cam, int frameStep){
     fs::path outDir = fs::path(caseDir) / "images";
     if (!fs::exists(outDir))
         fs::create_directories(outDir);
@@ -67,7 +67,7 @@ void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
         cout << "[Skip] Images exist: " << outDir << endl;
         return;
     }
-    
+
     // 读取时间戳
     fs::path tsFile = fs::path(caseDir) / "inputs" / "videoInfo.txt";
     ifstream finTS(tsFile);
@@ -82,7 +82,12 @@ void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
         timestamps.push_back(col2);
     }
     finTS.close();
-    
+
+    // 跳帧后对应的时间戳索引
+    vector<string> selectedTS;
+    for (size_t i = 0; i < timestamps.size(); i += frameStep)
+        selectedTS.push_back(timestamps[i]);
+
     // 找视频
     fs::path videoPath;
     for (auto& p : fs::directory_iterator(caseDir))
@@ -108,7 +113,8 @@ void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
     cv::Mat map1, map2;
     cv::initUndistortRectifyMap(K, distCoeffs, cv::Mat(), newK, frameSize, CV_16SC2, map1, map2);
 
-    size_t frameIndex = 0;
+    size_t frameIndex = 0;// 视频帧索引
+    size_t tsIndex = 0; // 已保存的时间戳索引
     vector<cv::Mat> batchFrames;
     const int batchSize = 16;
 
@@ -121,27 +127,27 @@ void preprocessFrames(const string& caseDir, const CameraInfo& cam) {
             cv::remap(frames[i], undistorted[i], map1, map2, cv::INTER_LINEAR);
 
         for (size_t i = 0; i < n; i++) {
-            if (frameIndex + i >= timestamps.size()) break; // 防越界
-            fs::path outPath = outDir / (timestamps[frameIndex + i] + ".jpg");
+            if (tsIndex >= timestamps.size()) break; // 防越界
+            fs::path outPath = outDir / (timestamps[tsIndex] + ".jpg");
             cv::imwrite(outPath.string(), undistorted[i]);
+            tsIndex++;
         }
-        frameIndex += n;
         frames.clear();
         };
 
     do {
-        batchFrames.push_back(frame.clone());
-        if (batchFrames.size() >= batchSize)
-            processBatch(batchFrames);
+        if (frameIndex % frameStep == 0) {  // 按间隔取帧
+            batchFrames.push_back(frame.clone());
+            if (batchFrames.size() >= batchSize)
+                processBatch(batchFrames);
+        }
+        frameIndex++;
     } while (cap.read(frame));
 
     if (!batchFrames.empty())
         processBatch(batchFrames);
-    
-    if (frameIndex != timestamps.size())
-        cerr << "[Warning] Frame count (" << frameIndex << ") != timestamp count (" << timestamps.size() << ")" << endl;
-    
-    cout << "Preprocessed frames for " << caseDir << endl;
+
+    cout << "Preprocessed frames for " << caseDir << " (step=" << frameStep << ", saved=" << tsIndex << ")" << endl;
 }
 
 
@@ -180,13 +186,13 @@ void loadPoints3D(const string& file, Eigen::MatrixXd& xyzs, Eigen::MatrixXd& rg
 }
 
 // -------------------- 单个案例处理 --------------------
-void processCase(const string& caseDir, CaseResult& result, bool preprocessFlag) {
+void processCase(const string& caseDir, CaseResult& result, bool preprocessFlag, int frameStep) {
     result.caseDir = caseDir;
     loadCameras(caseDir, result.cameras);
     if (result.cameras.empty()) return;
 
     if (preprocessFlag)
-        preprocessFrames(caseDir, result.cameras[0]);
+        preprocessFrames(caseDir, result.cameras[0], frameStep);
 
     extractFrames(caseDir, result.cameras[0], result.framePaths);
 
@@ -195,17 +201,19 @@ void processCase(const string& caseDir, CaseResult& result, bool preprocessFlag)
         loadPoints3D(pc_file.string(), result.xyzs, result.rgbs);
 }
 
+
 // -------------------- 批量处理 --------------------
-void processAllCases(const string& rootDir, vector<CaseResult>& results, bool preprocessFlag) {
+void processAllCases(const string& rootDir, vector<CaseResult>& results, bool preprocessFlag, int frameStep) {
     results.clear();
     for (auto& entry : fs::directory_iterator(rootDir)) {
         if (fs::is_directory(entry)) {
             string caseDir = entry.path().string();
             cout << "Processing case: " << caseDir << endl;
             CaseResult res;
-            processCase(caseDir, res, preprocessFlag);
+            processCase(caseDir, res, preprocessFlag, frameStep);
             results.push_back(std::move(res));
         }
     }
 }
+
 
