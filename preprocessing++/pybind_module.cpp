@@ -5,7 +5,7 @@
 
 namespace py = pybind11;
 
-// Îª Python ·â×° CameraInfo
+// ä¸º Python å°è£… CameraInfo
 PYBIND11_MODULE(py_preprocess, m) {
     m.doc() = "Python interface for PREPROCESS pipeline";
 
@@ -37,19 +37,20 @@ PYBIND11_MODULE(py_preprocess, m) {
         .def_readonly("xyzs", &CaseResult::xyzs)
         .def_readonly("rgbs", &CaseResult::rgbs);
 
-    // ´¦Àíµ¥¸ö°¸Àı
-    m.def("process_case", [](const std::string& caseDir, bool preprocessFlag = true) {
+        // å¤„ç†å•ä¸ªæ¡ˆä¾‹
+    m.def("process_case", [](const std::string& caseDir, bool preprocessFlag = true, int frameStep = 1) {
         CaseResult res;
-        processCase(caseDir, res, preprocessFlag);
+        processCase(caseDir, res, preprocessFlag, frameStep);
         return res;
-        }, py::arg("caseDir"), py::arg("preprocessFlag") = true,
+        }, py::arg("caseDir"), py::arg("preprocessFlag") = true, py::arg("frameStep") = 1,
             "Process a single case and return CaseResult");
 
-    // ÅúÁ¿´¦Àí¶à¸ö°¸Àı
-    m.def("process_all_cases", [](const std::string& rootDir, bool preprocessFlag = true) {
+    // æ‰¹é‡å¤„ç†å¤šä¸ªæ¡ˆä¾‹
+    m.def("process_all_cases", [](const std::string& rootDir, bool preprocessFlag = true, int frameStep = 1) {
         std::vector<CaseResult> results;
-        processAllCases(rootDir, results, preprocessFlag);
+        processAllCases(rootDir, results, preprocessFlag, frameStep);
         return results;
-        }, py::arg("rootDir"), py::arg("preprocessFlag") = true,
+        }, py::arg("rootDir"), py::arg("preprocessFlag") = true, py::arg("frameStep") = 1,
             "Process all cases in rootDir and return list of CaseResult");
 }
+
